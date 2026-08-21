@@ -75,6 +75,7 @@ from sglang.srt.layers.vocab_parallel_embedding import (
 from sglang.srt.model_executor.cuda_graph_runner import get_is_capture_mode
 from sglang.srt.model_executor.forward_batch_info import ForwardBatch, PPProxyTensors
 from sglang.srt.model_loader.weight_utils import default_weight_loader
+from sglang.srt.models.llada2_weight_utils import prepare_llada2_language_weights
 from sglang.srt.models.utils import (
     apply_qk_norm,
     create_fused_set_kv_buffer_arg,
@@ -810,6 +811,9 @@ class LLaDA2MoeModelLM(nn.Module):
     def end_layer(self):
         return self.model.end_layer
 
+    def get_input_embeddings(self):
+        return self.model.word_embeddings
+
     def get_embed_and_head(self):
         """Used by the eagle_worker."""
         return self.model.word_embeddings.weight, self.lm_head.weight
@@ -863,7 +867,9 @@ class LLaDA2MoeModelLM(nn.Module):
         )
 
         params_dict = dict(self.named_parameters())
-        for name, loaded_weight in weights:
+        for name, loaded_weight in prepare_llada2_language_weights(
+            weights, num_experts=self.config.num_experts
+        ):
             if (
                 ("v_head" in name)
                 or ("inv_freq" in name)

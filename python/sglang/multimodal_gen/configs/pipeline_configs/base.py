@@ -390,6 +390,12 @@ class PipelineConfig:
         """
         return self.task_type in (ModelTaskType.T2I, ModelTaskType.T2V)
 
+    def validate_num_outputs_per_prompt(
+        self, num_outputs_per_prompt: int, server_args
+    ) -> None:
+        """Validate a request's per-prompt output count for this pipeline."""
+        del num_outputs_per_prompt, server_args
+
     def estimate_request_cost(self, batch) -> float:
         """Return the relative cost used for batching admission caps.
 
@@ -974,6 +980,9 @@ class PipelineConfig:
             raise ValueError(
                 f"Length of text postprocess functions ({len(self.postprocess_text_funcs)}) must be equal to length of text preprocessing functions ({len(self.preprocess_text_funcs)})"
             )
+
+    def validate_server_args(self, server_args) -> None:
+        del server_args
 
     def dump_to_json(self, file_path: str):
         output_dict = shallow_asdict(self)

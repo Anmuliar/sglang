@@ -35,6 +35,7 @@ from sglang.multimodal_gen.configs.pipeline_configs import (
     HeliosMidConfig,
     HeliosT2VConfig,
     HunyuanConfig,
+    LLaDAImagePipelineConfig,
     WanI2V480PConfig,
     WanI2V720PConfig,
     WanT2V480PConfig,
@@ -103,6 +104,7 @@ from sglang.multimodal_gen.configs.sample.hunyuan3d import Hunyuan3DSamplingPara
 from sglang.multimodal_gen.configs.sample.joy_image import (
     JoyImageEditSamplingParams,
 )
+from sglang.multimodal_gen.configs.sample.llada_image import LLaDAImageSamplingParams
 from sglang.multimodal_gen.configs.sample.ltx_2 import (
     LTX2SamplingParams,
     LTX23HQSamplingParams,
@@ -818,7 +820,18 @@ def _register_configs():
             lambda hf_id: "z-image" in hf_id.lower() and "turbo" not in hf_id.lower()
         ],
     )
+    # LLaDA-Image
+    register_configs(
+        sampling_param_cls=LLaDAImageSamplingParams,
+        pipeline_config_cls=LLaDAImagePipelineConfig,
+        hf_model_paths=["inclusionAI/LLaDA-Image"],
+        model_detectors=[
+            lambda hf_id: "lladaimagepipeline" in hf_id.lower()
+            or "llada-image" in hf_id.lower()
+        ],
+    )
     # Qwen-Image
+
     register_configs(
         sampling_param_cls=QwenImageSamplingParams,
         pipeline_config_cls=QwenImagePipelineConfig,

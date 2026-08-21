@@ -47,6 +47,10 @@ from sglang.multimodal_gen.runtime.layers.linear import UnquantizedLinearMethod
 from sglang.multimodal_gen.runtime.layers.quantization.configs.nunchaku_config import (
     NunchakuConfig,
 )
+from sglang.multimodal_gen.runtime.layers.quantization.fp8 import (
+    Fp8Config,
+    Fp8LinearMethod,
+)
 from sglang.multimodal_gen.runtime.layers.quantization.modelopt_quant import (
     ModelOptFp4Config,
     _prepare_nvfp4_weight_bytes,
@@ -54,10 +58,13 @@ from sglang.multimodal_gen.runtime.layers.quantization.modelopt_quant import (
 from sglang.multimodal_gen.runtime.loader.transformer_load_utils import (
     _filter_duplicate_precision_variant_safetensors,
     _Flux2Nvfp4FallbackAdapter,
+    _ModelOptFp8OffloadAdapter,
+    _resolve_quant_config,
     resolve_transformer_quant_load_spec,
     resolve_transformer_safetensors_to_load,
 )
 from sglang.multimodal_gen.runtime.models.dits.flux import FluxSingleTransformerBlock
+from sglang.multimodal_gen.runtime.models.dits.llada_image import LLaDAImageFeedForward
 from sglang.multimodal_gen.tools.build_modelopt_nvfp4_transformer import (
     _updated_quant_config,
 )
@@ -71,6 +78,14 @@ class _FakeQuantConfig:
     @classmethod
     def get_name(cls):
         return "modelopt_fp4"
+
+
+class _FakeOnlineFp8Config:
+    is_checkpoint_fp8_serialized = False
+
+    @classmethod
+    def get_name(cls):
+        return "fp8"
 
 
 class TestTransformerQuantHelpers(unittest.TestCase):
@@ -91,6 +106,28 @@ class TestTransformerQuantHelpers(unittest.TestCase):
         )
         defaults.update(overrides)
         return SimpleNamespace(**defaults)
+
+    def test_explicit_fp8_quantization_uses_online_defaults(self):
+        config = _resolve_quant_config(
+            hf_config={},
+            server_args=self._make_server_args(quantization="fp8"),
+            safetensors_list=[],
+            component_model_path="/unused/component/path",
+        )
+
+        self.assertEqual(config.get_name(), "fp8")
+        self.assertFalse(config.is_checkpoint_fp8_serialized)
+        self.assertEqual(config.activation_scheme, "dynamic")
+
+    def test_online_fp8_disables_whole_dit_cpu_offload(self):
+        server_args = self._make_server_args(dit_cpu_offload=True)
+
+        _ModelOptFp8OffloadAdapter._maybe_disable_incompatible_dit_offload_modes(
+            server_args=server_args,
+            quant_config=_FakeOnlineFp8Config(),
+        )
+
+        self.assertFalse(server_args.dit_cpu_offload)
 
     def test_resolve_transformer_safetensors_to_load_uses_single_override_file(self):
         with tempfile.NamedTemporaryFile(suffix=".safetensors") as f:
@@ -278,6 +315,33 @@ class TestTransformerQuantHelpers(unittest.TestCase):
             updated["quantization_config"]["ignore"],
             ["single_transformer_blocks.*.proj_mlp*"],
         )
+
+    @patch("sglang.multimodal_gen.runtime.layers.linear.get_group_rank", return_value=0)
+    @patch("sglang.multimodal_gen.runtime.layers.linear.get_group_size", return_value=1)
+    @patch(
+        "sglang.multimodal_gen.runtime.layers.linear.get_tp_group", return_value=None
+    )
+    def test_llada_image_online_fp8_quantizes_fused_linears(
+        self,
+        _mock_tp_group,
+        _mock_group_size,
+        _mock_group_rank,
+    ):
+        fp8_module = "sglang.multimodal_gen.runtime.layers.quantization.fp8"
+        with patch(
+            f"{fp8_module}.get_tensor_model_parallel_world_size",
+            return_value=1,
+        ):
+            feed_forward = LLaDAImageFeedForward(
+                dim=192,
+                quant_config=Fp8Config(),
+                prefix="layers.0.feed_forward",
+            )
+
+        self.assertIsInstance(feed_forward.w13.quant_method, Fp8LinearMethod)
+        self.assertIsInstance(feed_forward.w2.quant_method, Fp8LinearMethod)
+        self.assertEqual(feed_forward.w13.prefix, "layers.0.feed_forward.w13")
+        self.assertEqual(feed_forward.w2.prefix, "layers.0.feed_forward.w2")
 
     @patch("sglang.multimodal_gen.runtime.layers.linear.get_group_rank", return_value=0)
     @patch("sglang.multimodal_gen.runtime.layers.linear.get_group_size", return_value=1)

@@ -220,7 +220,7 @@ class _Flux2Nvfp4FallbackAdapter(_TransformerQuantAdapter):
 
 
 class _ModelOptFp8OffloadAdapter(_TransformerQuantAdapter):
-    """Adapter for diffusion ModelOpt FP8 checkpoints."""
+    """Disable whole-DiT CPU offload for FP8 modes that require CUDA setup."""
 
     def __init__(
         self,
@@ -241,15 +241,18 @@ class _ModelOptFp8OffloadAdapter(_TransformerQuantAdapter):
 
         quant_name_getter = getattr(type(quant_config), "get_name", None)
         quant_name = quant_name_getter() if callable(quant_name_getter) else None
-        if quant_name != "modelopt_fp8":
+        is_online_fp8 = quant_name == "fp8" and not getattr(
+            quant_config, "is_checkpoint_fp8_serialized", False
+        )
+        if quant_name != "modelopt_fp8" and not is_online_fp8:
             return
 
         if server_args.dit_cpu_offload:
             server_args.dit_cpu_offload = False
             logger.warning(
-                "ModelOpt FP8 diffusion checkpoints currently keep dit_cpu_offload "
-                "disabled. Layerwise DiT offload stays enabled because the runtime "
-                "now preserves the restored FP8 tensor strides.",
+                "%s diffusion quantization requires CUDA weight setup; disabling "
+                "dit_cpu_offload. Layerwise DiT offload remains unchanged.",
+                quant_name,
             )
 
     def prepare(self) -> None:
@@ -492,6 +495,8 @@ def _resolve_quant_config(
         )
 
         quant_cls = get_quantization_config(server_args.quantization)
+        if server_args.quantization == "fp8":
+            return quant_cls()
         return quant_cls.from_config({})
 
     arch_config = server_args.pipeline_config.dit_config.arch_config

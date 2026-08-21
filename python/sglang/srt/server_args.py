@@ -157,6 +157,7 @@ ATTENTION_BACKEND_CHOICES = [
     "fa3",
     "fa4",
     "flashinfer",
+    "llada2_cfg_flashinfer",
     "flashmla",
     "trtllm_mla",
     "tokenspeed_mla",

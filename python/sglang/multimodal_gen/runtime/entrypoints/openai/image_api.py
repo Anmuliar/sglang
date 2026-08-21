@@ -53,6 +53,15 @@ def _get_extra_field(request, field_name):
     return value
 
 
+def _validate_num_outputs_per_prompt(server_args, num_outputs_per_prompt: int) -> None:
+    try:
+        server_args.pipeline_config.validate_num_outputs_per_prompt(
+            num_outputs_per_prompt, server_args
+        )
+    except ValueError as error:
+        raise HTTPException(status_code=400, detail=str(error)) from error
+
+
 def _read_b64_for_paths(paths: list[str]) -> list[str]:
     """Read and base64-encode each file. Must be called before cloud upload deletes them."""
     result = []
@@ -130,6 +139,8 @@ async def generations(
 ):
     request_id = generate_request_id()
     server_args = get_global_server_args()
+    num_outputs_per_prompt = max(1, min(int(request.n or 1), 10))
+    _validate_num_outputs_per_prompt(server_args, num_outputs_per_prompt)
     ext = choose_output_image_ext(request.output_format, request.background)
 
     with temp_dir_if_disabled(server_args.output_path) as output_dir:
@@ -139,7 +150,7 @@ async def generations(
             size=request.size,
             width=request.width,
             height=request.height,
-            num_outputs_per_prompt=max(1, min(int(request.n or 1), 10)),
+            num_outputs_per_prompt=num_outputs_per_prompt,
             output_file_name=f"{request_id}.{ext}",
             output_path=output_dir,
             seed=request.seed,
@@ -250,6 +261,9 @@ async def edits(
             status_code=422, detail="Field 'image' or 'url' is required"
         )
 
+    num_outputs_per_prompt = max(1, min(int(n or 1), 10))
+    _validate_num_outputs_per_prompt(server_args, num_outputs_per_prompt)
+
     image_list = merge_image_input_list(images, urls)
 
     with contextlib.ExitStack() as stack:
@@ -279,7 +293,7 @@ async def edits(
             request_id,
             prompt=prompt,
             size=size,
-            num_outputs_per_prompt=max(1, min(int(n or 1), 10)),
+            num_outputs_per_prompt=num_outputs_per_prompt,
             output_file_name=f"{request_id}.{ext}",
             output_path=output_dir,
             image_path=input_paths,

@@ -1604,6 +1604,7 @@ class ServerArgs(DisaggArgsMixin):
             raise ValueError("pipeline_config is not set in ServerArgs")
 
         self.pipeline_config.check_pipeline_config()
+        self.pipeline_config.validate_server_args(self)
 
     def _validate_offload(self):
         # validate dit_offload_prefetch_size
