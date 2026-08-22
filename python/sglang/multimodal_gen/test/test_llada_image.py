@@ -17,8 +17,14 @@ from sglang.multimodal_gen.runtime.models.dits.llada_image import (
     LLaDAImageTransformerBlock,
     _LLaDAImageTransformer2DModel,
 )
+from sglang.multimodal_gen.runtime.models.schedulers.scheduling_flow_match_euler_discrete import (
+    FlowMatchEulerDiscreteScheduler,
+)
 from sglang.multimodal_gen.runtime.pipelines_core.stages.llada_image_conditioning import (
     format_llada_image_prompt,
+)
+from sglang.multimodal_gen.runtime.pipelines_core.stages.timestep_preparation import (
+    TimestepPreparationStage,
 )
 from sglang.multimodal_gen.runtime.platforms import AttentionBackendEnum
 from sglang.multimodal_gen.runtime.server_args import (
@@ -103,6 +109,38 @@ class TestLLaDAImage(unittest.TestCase):
                 num_frames=1,
             ),
             (1, 128, 64, 48),
+        )
+
+    def test_timestep_stage_uses_uniform_scheduler_schedule(self):
+        scheduler = FlowMatchEulerDiscreteScheduler(
+            shift=3.0,
+            use_uniform_sigmas=True,
+        )
+        stage = TimestepPreparationStage(scheduler)
+        batch = SimpleNamespace(
+            scheduler=None,
+            timesteps=None,
+            sigmas=None,
+            num_inference_steps=4,
+            n_tokens=None,
+            extra={},
+            is_warmup=True,
+        )
+        server_args = SimpleNamespace(pipeline_config=LLaDAImagePipelineConfig())
+        module = (
+            "sglang.multimodal_gen.runtime.pipelines_core.stages.timestep_preparation"
+        )
+
+        with (
+            patch(f"{module}.get_local_torch_device", return_value=torch.device("cpu")),
+            patch(f"{module}.get_or_create_request_scheduler", return_value=scheduler),
+        ):
+            stage.forward(batch, server_args)
+
+        self.assertIsNone(batch.sigmas)
+        torch.testing.assert_close(
+            scheduler.sigmas,
+            torch.tensor([1.0, 0.9, 0.75, 0.5, 0.0]),
         )
 
     def test_pipeline_config_rejects_unaligned_resolution(self):

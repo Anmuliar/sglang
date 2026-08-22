@@ -90,6 +90,9 @@ class FlowMatchEulerDiscreteScheduler(
             Whether to use exponential sigmas for step sizes in the noise schedule during sampling.
         use_beta_sigmas (`bool`, defaults to False):
             Whether to use beta sigmas for step sizes in the noise schedule during sampling.
+        use_uniform_sigmas (`bool`, defaults to False):
+            Whether to use a uniform pre-shift sigma grid that excludes the terminal zero. The terminal zero is
+            appended after shifting.
         time_shift_type (`str`, defaults to "exponential"):
             The type of dynamic resolution-dependent timestep shifting to apply. Either "exponential" or "linear".
         stochastic_sampling (`bool`, defaults to False):
@@ -114,6 +117,7 @@ class FlowMatchEulerDiscreteScheduler(
         use_karras_sigmas: bool | None = False,
         use_exponential_sigmas: bool | None = False,
         use_beta_sigmas: bool | None = False,
+        use_uniform_sigmas: bool | None = False,
         time_shift_type: str = "exponential",
         stochastic_sampling: bool = False,
     ):
@@ -123,12 +127,14 @@ class FlowMatchEulerDiscreteScheduler(
                     self.config.use_beta_sigmas,
                     self.config.use_exponential_sigmas,
                     self.config.use_karras_sigmas,
+                    self.config.use_uniform_sigmas,
                 ]
             )
             > 1
         ):
             raise ValueError(
-                "Only one of `config.use_beta_sigmas`, `config.use_exponential_sigmas`, `config.use_karras_sigmas` can be used."
+                "Only one of `config.use_beta_sigmas`, `config.use_exponential_sigmas`, "
+                "`config.use_karras_sigmas`, `config.use_uniform_sigmas` can be used."
             )
         if time_shift_type not in {"exponential", "linear"}:
             raise ValueError(
@@ -339,13 +345,18 @@ class FlowMatchEulerDiscreteScheduler(
 
         sigmas_array: np.ndarray
         if sigmas is None:
-            if timesteps_array is None:
-                timesteps_array = np.linspace(
-                    self._sigma_to_t(self.sigma_max),
-                    self._sigma_to_t(self.sigma_min),
-                    num_inference_steps,
-                )
-            sigmas_array = timesteps_array / self.config.num_train_timesteps
+            if timesteps_array is None and self.config.use_uniform_sigmas:
+                sigmas_array = np.linspace(
+                    1.0, 0.0, num_inference_steps + 1, dtype=np.float32
+                )[:-1]
+            else:
+                if timesteps_array is None:
+                    timesteps_array = np.linspace(
+                        self._sigma_to_t(self.sigma_max),
+                        self._sigma_to_t(self.sigma_min),
+                        num_inference_steps,
+                    )
+                sigmas_array = timesteps_array / self.config.num_train_timesteps
         else:
             sigmas_array = np.array(sigmas).astype(np.float32)
             num_inference_steps = len(sigmas_array)
