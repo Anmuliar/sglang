@@ -68,7 +68,10 @@ class LLaDAImageSourceImageConditioningStage(PipelineStage):
             raise ValueError("LLaDA-Image editing requires exactly one source image")
 
         image = self.image_processor.preprocess(
-            source_images[0], height=batch.height, width=batch.width
+            source_images[0], 
+            height=batch.height, 
+            width=batch.width,
+            resize_mode="crop",
         )
         if image.shape[0] == 1 and batch.batch_size > 1:
             image = image.repeat(batch.batch_size, 1, 1, 1)
