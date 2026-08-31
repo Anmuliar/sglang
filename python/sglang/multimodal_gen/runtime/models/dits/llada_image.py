@@ -1388,10 +1388,6 @@ class _LLaDAImageTransformer2DModel(ModelMixin, ConfigMixin, AttentionMixin):
                         )
 
             if get_sp_world_size() > 1:
-                if batch_size != 1:
-                    raise NotImplementedError(
-                        "LLaDA-Image sequence parallelism currently supports batch size 1."
-                    )
                 feature_groups = (image_features, cap_features, sigvq_features)
                 frequency_groups = (
                     image_frequencies,
@@ -1404,8 +1400,13 @@ class _LLaDAImageTransformer2DModel(ModelMixin, ConfigMixin, AttentionMixin):
                     cap_noise_mask,
                     sigvq_noise_mask,
                 )
-                num_replicated_suffix = cap_lengths[0] + sigvq_lengths[0]
-                image_offsets = [(0, image_lengths[0])]
+                num_replicated_suffix = max(
+                    cap_length + sigvq_length
+                    for cap_length, sigvq_length in zip(
+                        cap_lengths, sigvq_lengths, strict=True
+                    )
+                )
+                image_offsets = [(0, length) for length in image_lengths]
             else:
                 feature_groups = (cap_features, image_features, sigvq_features)
                 frequency_groups = (
@@ -1561,11 +1562,7 @@ class _LLaDAImageTransformer2DModel(ModelMixin, ConfigMixin, AttentionMixin):
                 (image_lengths, condition_lengths),
             )
             if get_sp_world_size() > 1:
-                if batch_size != 1:
-                    raise NotImplementedError(
-                        "LLaDA-Image sequence parallelism currently supports batch size 1."
-                    )
-                num_replicated_suffix = condition_lengths[0]
+                num_replicated_suffix = max(condition_lengths)
 
         for layer in self.layers:
             if torch.is_grad_enabled() and self.gradient_checkpointing:

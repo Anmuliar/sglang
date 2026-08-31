@@ -64,6 +64,20 @@ class LLaDAImageTextEncoderRunner:
         text_tp_size = int(server_args.sp_degree)
         text_tp_rank = get_sp_parallel_rank()
         text_dp_attention = text_tp_size > 1
+        dynamic_conditioning_requests = 2 * int(
+            getattr(server_args, "batching_max_size", 1)
+        )
+        max_conditioning_requests = max(
+            4 if text_dp_attention else 2,
+            dynamic_conditioning_requests,
+        )
+        query_count = int(
+            getattr(getattr(queryformer, "config", None), "num_queries", 256)
+        )
+        conditioning_token_budget = max(
+            8192,
+            dynamic_conditioning_requests * (2048 + query_count),
+        )
 
         self.queryformer = queryformer
         self.text_projection = text_projection
@@ -95,9 +109,9 @@ class LLaDAImageTextEncoderRunner:
             disable_cuda_graph=True,
             disable_radix_cache=True,
             chunked_prefill_size=-1,
-            max_prefill_tokens=8192,
-            max_total_tokens=8192,
-            max_running_requests=4 if text_dp_attention else 2,
+            max_prefill_tokens=conditioning_token_budget,
+            max_total_tokens=conditioning_token_budget,
+            max_running_requests=max_conditioning_requests,
             mem_fraction_static=(
                 server_args.pipeline_config.text_encoder_mem_fraction_static
             ),
@@ -398,12 +412,29 @@ class LLaDAImageTextConditioningStage(PipelineStage):
 
     @torch.no_grad()
     def forward(self, batch: Req, server_args: ServerArgs) -> Req:
-        if not isinstance(batch.prompt, str):
-            raise TypeError("LLaDA-Image currently supports one prompt per request")
+        raw_prompts = (
+            batch.prompt if isinstance(batch.prompt, list) else [batch.prompt]
+        )
+        if not raw_prompts or not all(
+            isinstance(prompt, str) for prompt in raw_prompts
+        ):
+            raise TypeError("LLaDA-Image prompts must be strings")
+
         do_cfg = batch.guidance_scale > 1.0
-        prompts = [format_llada_image_prompt(batch.prompt)]
+        prompt_count = len(raw_prompts)
+        prompts = [format_llada_image_prompt(prompt) for prompt in raw_prompts]
         if do_cfg:
-            prompts.append(format_llada_image_prompt(batch.negative_prompt))
+            negative_prompts = batch.negative_prompt
+            if isinstance(negative_prompts, list):
+                if len(negative_prompts) != prompt_count:
+                    raise ValueError(
+                        "LLaDA-Image negative_prompt must match the prompt batch size"
+                    )
+            else:
+                negative_prompts = [negative_prompts] * prompt_count
+            prompts.extend(
+                format_llada_image_prompt(prompt) for prompt in negative_prompts
+            )
 
         outputs = self.runner.encode(
             prompts,
@@ -415,12 +446,28 @@ class LLaDAImageTextConditioningStage(PipelineStage):
             for output in outputs
         ]
         output_count = batch.num_outputs_per_prompt
-        batch.prompt_embeds = [outputs[0]] * output_count
-        batch.prompt_attention_mask = [masks[0]] * output_count
+        positive_outputs = outputs[:prompt_count]
+        positive_masks = masks[:prompt_count]
+        batch.prompt_embeds = [
+            output
+            for output in positive_outputs
+            for _ in range(output_count)
+        ]
+        batch.prompt_attention_mask = [
+            mask for mask in positive_masks for _ in range(output_count)
+        ]
         batch.do_classifier_free_guidance = do_cfg
         if do_cfg:
-            batch.negative_prompt_embeds = [outputs[1]] * output_count
-            batch.negative_attention_mask = [masks[1]] * output_count
+            negative_outputs = outputs[prompt_count:]
+            negative_masks = masks[prompt_count:]
+            batch.negative_prompt_embeds = [
+                output
+                for output in negative_outputs
+                for _ in range(output_count)
+            ]
+            batch.negative_attention_mask = [
+                mask for mask in negative_masks for _ in range(output_count)
+            ]
         else:
             batch.negative_prompt_embeds = []
             batch.negative_attention_mask = []

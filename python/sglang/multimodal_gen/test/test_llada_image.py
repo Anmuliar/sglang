@@ -627,6 +627,89 @@ class TestLLaDAImage(unittest.TestCase):
         self.assertEqual(sigvq_refiner.skip_values, [])
         self.assertEqual(main_block.skip_values, [False])
 
+    def test_dit_accepts_request_batches_for_sp1_and_sp2_kv_gather(self):
+        model_module = "sglang.multimodal_gen.runtime.models.dits.llada_image"
+        linear_module = "sglang.multimodal_gen.runtime.layers.linear"
+        with (
+            patch(f"{model_module}.get_tp_world_size", return_value=1),
+            patch(f"{linear_module}.get_tp_group", return_value=None),
+            patch(f"{linear_module}.get_group_size", return_value=1),
+            patch(f"{linear_module}.get_group_rank", return_value=0),
+            patch(
+                "sglang.multimodal_gen.runtime.layers.attention.layer.get_ring_parallel_world_size",
+                return_value=1,
+            ),
+            patch(
+                "sglang.multimodal_gen.runtime.layers.attention.selector.get_global_server_args",
+                return_value=SimpleNamespace(attention_backend="torch_sdpa"),
+            ),
+        ):
+            model = _LLaDAImageTransformer2DModel(
+                in_channels=4,
+                dim=64,
+                n_layers=1,
+                n_refiner_layers=1,
+                n_heads=2,
+                cap_feat_dim=8,
+                semantic_feat_dim=10,
+                axes_dims=(8, 12, 12),
+                axes_lens=(256, 32, 32),
+            )
+
+        for sp_degree in (1, 2):
+            with self.subTest(sp_degree=sp_degree):
+                model.noise_refiner = torch.nn.ModuleList([_CaptureSPBlock()])
+                model.context_refiner = torch.nn.ModuleList([_CaptureSPBlock()])
+                model.sigvq_refiner = torch.nn.ModuleList([_CaptureSPBlock()])
+                main_block = _CaptureSPBlock()
+                model.layers = torch.nn.ModuleList([main_block])
+                local_height = 4 // sp_degree
+                targets = [
+                    torch.randn(4, 1, local_height, 4),
+                    torch.randn(4, 1, local_height, 4),
+                ]
+                cap_features = [torch.randn(3, 8), torch.randn(40, 8)]
+
+                with (
+                    patch(
+                        f"{model_module}.get_sp_world_size",
+                        return_value=sp_degree,
+                    ),
+                    patch(f"{model_module}.get_sp_parallel_rank", return_value=0),
+                    torch.no_grad(),
+                ):
+                    t2i_outputs = model(
+                        x=targets,
+                        t=torch.tensor([0.5, 0.25]),
+                        cap_feats=cap_features,
+                    ).sample
+                    edit_outputs = model(
+                        x=targets,
+                        t=torch.tensor([0.5, 0.25]),
+                        cap_feats=cap_features,
+                        glm_cap_feats=[torch.randn(4, 10), torch.randn(6, 10)],
+                        source_latents=[
+                            torch.randn(4, 1, local_height, 4),
+                            torch.randn(4, 1, local_height, 4),
+                        ],
+                    ).sample
+
+                expected_shape = (4, 1, local_height, 4)
+                self.assertEqual(len(t2i_outputs), 2)
+                self.assertEqual(len(edit_outputs), 2)
+                self.assertEqual(
+                    [tuple(item.shape) for item in t2i_outputs],
+                    [expected_shape] * 2,
+                )
+                self.assertEqual(
+                    [tuple(item.shape) for item in edit_outputs],
+                    [expected_shape] * 2,
+                )
+                self.assertEqual(
+                    main_block.replicated_suffixes,
+                    [0, 0] if sp_degree == 1 else [64, 160],
+                )
+
     def test_sp_uses_global_height_coordinates_for_generation_and_edit(self):
         calls = []
 
