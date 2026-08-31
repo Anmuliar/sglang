@@ -19,10 +19,14 @@ _GLOBAL_ARGS_PATCH = (
 class _FakeImageProcessor:
     def __init__(self):
         self.calls = []
-        self.output = torch.arange(3 * 8 * 12, dtype=torch.float32).reshape(1, 3, 8, 12)
+        self.output = None
 
     def preprocess(self, image, height, width, resize_mode):
         self.calls.append((image, height, width, resize_mode))
+        batch_size = len(image) if isinstance(image, list) else 1
+        self.output = torch.arange(
+            batch_size * 3 * 8 * 12, dtype=torch.float32
+        ).reshape(batch_size, 3, 8, 12)
         return self.output.clone()
 
 
@@ -105,9 +109,11 @@ class TestLLaDAImageSourceImageConditioningStage(unittest.TestCase):
         image = Image.new("RGB", (40, 30), color="red")
         batch = SimpleNamespace(
             condition_image=image,
+            prompt="change the background",
             height=64,
             width=80,
             batch_size=2,
+            num_outputs_per_prompt=2,
             image_embeds=[],
             source_latents=None,
         )
@@ -135,15 +141,49 @@ class TestLLaDAImageSourceImageConditioningStage(unittest.TestCase):
         for actual, wanted in zip(result.source_latents, expected, strict=True):
             torch.testing.assert_close(actual, wanted, rtol=0, atol=0)
 
-    def test_edit_rejects_more_than_one_source_image(self):
+    def test_edit_batches_one_source_image_per_prompt(self):
+        images = [
+            Image.new("RGB", (32, 32), color="red"),
+            Image.new("RGB", (32, 32), color="blue"),
+        ]
+        batch = SimpleNamespace(
+            condition_image=images,
+            prompt=["make it sunny", "make it rainy"],
+            height=64,
+            width=64,
+            batch_size=4,
+            num_outputs_per_prompt=2,
+            image_embeds=[],
+            source_latents=None,
+        )
+
+        result = self.stage.forward(batch, server_args=SimpleNamespace())
+
+        self.assertEqual(self.processor.calls, [(images, 64, 64, "crop")])
+        self.assertEqual(tuple(self.vae.encoded_image.shape), (4, 3, 8, 12))
+        torch.testing.assert_close(
+            self.vae.encoded_image[0], self.vae.encoded_image[1]
+        )
+        torch.testing.assert_close(
+            self.vae.encoded_image[2], self.vae.encoded_image[3]
+        )
+        self.assertFalse(
+            torch.equal(self.vae.encoded_image[0], self.vae.encoded_image[2])
+        )
+        self.assertEqual(len(result.image_embeds), 4)
+        self.assertEqual(len(result.source_latents), 4)
+
+    def test_edit_rejects_source_count_that_does_not_match_prompts(self):
         batch = SimpleNamespace(
             condition_image=[Image.new("RGB", (32, 32))] * 2,
+            prompt="make it sunny",
             height=64,
             width=64,
             batch_size=1,
+            num_outputs_per_prompt=1,
         )
 
-        with self.assertRaisesRegex(ValueError, "exactly one source image"):
+        with self.assertRaisesRegex(ValueError, "one source image per prompt"):
             self.stage.forward(batch, server_args=SimpleNamespace())
 
     def test_source_normalization_matches_official_std_cast_order(self):

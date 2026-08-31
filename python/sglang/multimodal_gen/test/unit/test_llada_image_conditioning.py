@@ -82,6 +82,43 @@ class TestLLaDAImageTextConditioning(unittest.TestCase):
         self.assertEqual(result.negative_prompt_embeds, [])
         self.assertEqual(result.negative_attention_mask, [])
 
+    def test_batches_prompts_and_preserves_per_request_output_order(self):
+        batch = SimpleNamespace(
+            prompt=["a red car", "a blue boat"],
+            negative_prompt=["no road", "no harbor"],
+            guidance_scale=5.0,
+            num_outputs_per_prompt=2,
+            max_sequence_length=128,
+        )
+
+        result = self.stage.forward(batch, server_args=SimpleNamespace())
+
+        encoded_prompts, max_sequence_length = self.runner.prompts
+        self.assertEqual(max_sequence_length, 128)
+        self.assertEqual(
+            encoded_prompts,
+            [
+                "<role>HUMAN</role> Generate an image: a red car\n"
+                "<role>ASSISTANT</role>\n<IMAGE1>",
+                "<role>HUMAN</role> Generate an image: a blue boat\n"
+                "<role>ASSISTANT</role>\n<IMAGE1>",
+                "<role>HUMAN</role> Generate an image: no road\n"
+                "<role>ASSISTANT</role>\n<IMAGE1>",
+                "<role>HUMAN</role> Generate an image: no harbor\n"
+                "<role>ASSISTANT</role>\n<IMAGE1>",
+            ],
+        )
+        self.assertEqual(
+            [float(output[0, 0]) for output in result.prompt_embeds],
+            [1.0, 1.0, 2.0, 2.0],
+        )
+        self.assertEqual(
+            [float(output[0, 0]) for output in result.negative_prompt_embeds],
+            [3.0, 3.0, 4.0, 4.0],
+        )
+        self.assertEqual(len(result.prompt_attention_mask), 4)
+        self.assertEqual(len(result.negative_attention_mask), 4)
+
     def test_conditioning_mask_guard_fails_closed(self):
         from sglang.multimodal_gen.runtime.pipelines_core.stages.llada_image_conditioning import (
             ensure_conditioning_mask_active,
@@ -202,6 +239,7 @@ class TestLLaDAImageTextConditioning(unittest.TestCase):
                 tokenizer=object(),
                 server_args=SimpleNamespace(
                     sp_degree=2,
+                    batching_max_size=1,
                     nccl_port=29500,
                     trust_remote_code=True,
                     revision=None,
@@ -217,6 +255,7 @@ class TestLLaDAImageTextConditioning(unittest.TestCase):
                 tokenizer=object(),
                 server_args=SimpleNamespace(
                     sp_degree=2,
+                    batching_max_size=1,
                     nccl_port=29500,
                     trust_remote_code=False,
                     revision="pinned-rev",
@@ -243,6 +282,8 @@ class TestLLaDAImageTextConditioning(unittest.TestCase):
         self.assertEqual(runner.server_args.moe_dense_tp_size, 1)
         self.assertEqual(runner.server_args.moe_a2a_backend, "none")
         self.assertEqual(runner.server_args.max_running_requests, 4)
+        self.assertEqual(runner.server_args.max_prefill_tokens, 8192)
+        self.assertEqual(runner.server_args.max_total_tokens, 8192)
         parallel_state = worker_cls.call_args_list[0].kwargs["ps"]
         self.assertEqual(parallel_state.tp_rank, 1)
         self.assertEqual(parallel_state.tp_size, 2)

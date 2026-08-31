@@ -37,11 +37,6 @@ class LLaDAImagePipelineConfig(SpatialImagePipelineConfig):
 
     latent_scale_factor: int = 16
     text_encoder_mem_fraction_static: float = 0.35
-    max_request_pixel_area: int = 2048 * 2048
-    # The embedded text worker admits 8192 prefill tokens shared by the two
-    # CFG sequences and each sequence appends 256 query tokens.
-    max_request_text_tokens: int = 3584
-    max_request_total_pixel_area: int = 10 * 1024 * 1024
 
     def prepare_sigmas(self, sigmas, num_inference_steps):
         if sigmas is not None:
@@ -106,6 +101,16 @@ class LLaDAImagePipelineConfig(SpatialImagePipelineConfig):
                 "LLaDA-Image requires num_gpus == sp_degree so every GPU belongs "
                 "to the sequence-parallel group"
             )
+        if (
+            server_args.sp_degree > 1
+            and server_args.batching_max_size > 1
+            and server_args.kv_gather_degree != server_args.sp_degree
+        ):
+            raise ValueError(
+                "LLaDA-Image dynamic batching with SP requires K/V-gather; "
+                "leave the SP split unset for the automatic SP=2 configuration "
+                "or set kv_gather_degree=sp_degree"
+            )
         if server_args.text_encoder_cpu_offload:
             if server_args.is_arg_explicitly_set("text_encoder_cpu_offload"):
                 raise ValueError(
@@ -154,21 +159,6 @@ class LLaDAImagePipelineConfig(SpatialImagePipelineConfig):
                     "remain resident"
                 )
 
-        area_override = server_args.llada_image_max_pixel_area
-        if area_override is not None and area_override <= 0:
-            raise ValueError("llada_image_max_pixel_area must be positive")
-        total_area_override = server_args.llada_image_max_total_pixel_area
-        if total_area_override is not None and total_area_override <= 0:
-            raise ValueError("llada_image_max_total_pixel_area must be positive")
-        tokens_override = server_args.llada_image_max_text_tokens
-        if tokens_override is not None and not (
-            0 < tokens_override <= self.max_request_text_tokens
-        ):
-            raise ValueError(
-                "llada_image_max_text_tokens must be positive and at most "
-                f"{self.max_request_text_tokens}, the embedded worker budget"
-            )
-
     # The embedded srt worker and its KV pool are invisible to generic module
     # discovery, so partial sleep or update would misreport.
     def supports_memory_release(self) -> bool:
@@ -177,115 +167,11 @@ class LLaDAImagePipelineConfig(SpatialImagePipelineConfig):
     def supports_hot_weight_updates(self) -> bool:
         return False
 
-    def validate_num_outputs_per_prompt(
-        self, num_outputs_per_prompt: int, server_args
-    ) -> None:
-        if server_args.sp_degree > 1 and num_outputs_per_prompt != 1:
-            raise ValueError(
-                "LLaDA-Image sequence parallelism supports only n=1. "
-                "submit separate requests for multiple images"
-            )
+    def supports_dynamic_batching(self) -> bool:
+        return True
 
-    def validate_edit_source_count(self, source_count: int, server_args) -> None:
-        del server_args
-        if source_count != 1:
-            raise ValueError("LLaDA-Image editing requires exactly one source image")
-
-    def validate_request_sampling_params(self, sampling_params, server_args) -> None:
-        enable_cache_dit = sampling_params.enable_cache_dit
-        if enable_cache_dit is not None and enable_cache_dit is not False:
-            raise ValueError("LLaDA-Image does not support enable_cache_dit")
-        if sampling_params.cache_dit_params is not None:
-            raise ValueError("LLaDA-Image does not support cache_dit_params")
-
-        attention_backend = sampling_params.attention_backend_override
-        supported_attention_backends = {"FA", "TORCH_SDPA"}
-        if attention_backend is not None and (
-            not isinstance(attention_backend, str)
-            or attention_backend.upper() not in supported_attention_backends
-        ):
-            raise ValueError(
-                "LLaDA-Image attention_backend_override must be fa or torch_sdpa"
-            )
-
-        cfg_gate_step = sampling_params.cfg_gate_step
-        if cfg_gate_step is not None and (
-            isinstance(cfg_gate_step, bool)
-            or not isinstance(cfg_gate_step, (int, float))
-            or not 0.0 <= cfg_gate_step <= 1.0
-            or not np.isfinite(cfg_gate_step)
-        ):
-            raise ValueError("LLaDA-Image cfg_gate_step must be between 0.0 and 1.0")
-
-        width = int(sampling_params.width or 0)
-        height = int(sampling_params.height or 0)
-        if width <= 0 or height <= 0:
-            raise ValueError("LLaDA-Image requires positive width and height")
-        if width % self.latent_scale_factor or height % self.latent_scale_factor:
-            raise ValueError(
-                f"LLaDA-Image width and height must be divisible by "
-                f"{self.latent_scale_factor}"
-            )
-        sp_height_multiple = self.latent_scale_factor * server_args.sp_degree
-        if height % sp_height_multiple:
-            raise ValueError(
-                f"LLaDA-Image output height must be divisible by "
-                f"{sp_height_multiple} at SP degree {server_args.sp_degree}"
-            )
-        area_cap = (
-            server_args.llada_image_max_pixel_area
-            if server_args.llada_image_max_pixel_area is not None
-            else self.max_request_pixel_area
-        )
-        if width * height > area_cap:
-            raise ValueError(
-                f"LLaDA-Image output area {width}x{height} exceeds the "
-                f"supported maximum of {area_cap} pixels"
-            )
-        total_area_cap = (
-            server_args.llada_image_max_total_pixel_area
-            if server_args.llada_image_max_total_pixel_area is not None
-            else self.max_request_total_pixel_area
-        )
-        num_outputs = sampling_params.num_outputs_per_prompt
-        if num_outputs is not None:
-            total_area = width * height * max(1, int(num_outputs))
-            if total_area > total_area_cap:
-                raise ValueError(
-                    f"LLaDA-Image total output area {total_area} pixels across "
-                    f"{num_outputs} outputs exceeds the supported maximum of "
-                    f"{total_area_cap} pixels per request"
-                )
-        tokens_cap = (
-            server_args.llada_image_max_text_tokens
-            if server_args.llada_image_max_text_tokens is not None
-            else self.max_request_text_tokens
-        )
-        self._validate_max_sequence_length(
-            sampling_params.max_sequence_length, tokens_cap
-        )
-        extra_kwargs = sampling_params.diffusers_kwargs
-        if isinstance(extra_kwargs, dict) and "max_sequence_length" in extra_kwargs:
-            # prepare_request later overrides the request value from this channel.
-            self._validate_max_sequence_length(
-                extra_kwargs["max_sequence_length"], tokens_cap
-            )
-
-    @staticmethod
-    def _validate_max_sequence_length(max_sequence_length, tokens_cap: int) -> None:
-        if max_sequence_length is None:
-            return
-        if (
-            isinstance(max_sequence_length, bool)
-            or not isinstance(max_sequence_length, int)
-            or max_sequence_length <= 0
-        ):
-            raise ValueError("max_sequence_length must be a positive integer")
-        if max_sequence_length > tokens_cap:
-            raise ValueError(
-                f"max_sequence_length {max_sequence_length} exceeds the "
-                f"embedded text encoder budget of {tokens_cap} tokens"
-            )
+    def supports_image_conditioned_dynamic_batching(self) -> bool:
+        return True
 
     @staticmethod
     def _prepare_condition_list(values, name: str, expected_size: int, device, dtype):

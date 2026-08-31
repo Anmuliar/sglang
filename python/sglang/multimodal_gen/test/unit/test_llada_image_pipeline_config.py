@@ -115,10 +115,9 @@ class TestLLaDAImagePipelineConfig(unittest.TestCase):
             dp_size=1,
             cfg_parallel_degree=1,
             num_gpus=2,
+            batching_max_size=1,
+            kv_gather_degree=1,
             text_encoder_cpu_offload=False,
-            llada_image_max_pixel_area=None,
-            llada_image_max_text_tokens=None,
-            llada_image_max_total_pixel_area=None,
             is_arg_explicitly_set=lambda name: False,
             residency_mode=lambda name: "resident",
             explicit_residency_mode=lambda name: None,
@@ -126,6 +125,34 @@ class TestLLaDAImagePipelineConfig(unittest.TestCase):
             cpu_offload_components=None,
         )
         self.config.validate_server_args(SimpleNamespace(**defaults))
+        self.assertTrue(self.config.supports_dynamic_batching())
+        self.assertTrue(
+            self.config.supports_image_conditioned_dynamic_batching()
+        )
+        self.config.validate_server_args(
+            SimpleNamespace(
+                **(
+                    defaults
+                    | {
+                        "batching_max_size": 2,
+                        "kv_gather_degree": 2,
+                    }
+                )
+            )
+        )
+        self.config.validate_server_args(
+            SimpleNamespace(
+                **(
+                    defaults
+                    | {
+                        "sp_degree": 1,
+                        "ulysses_degree": 1,
+                        "num_gpus": 1,
+                        "batching_max_size": 2,
+                    }
+                )
+            )
+        )
 
         with (
             patch.dict(os.environ, {"SGLANG_CACHE_DIT_ENABLED": "true"}),
@@ -160,6 +187,10 @@ class TestLLaDAImagePipelineConfig(unittest.TestCase):
                 {"sp_degree": 4, "ulysses_degree": 4, "num_gpus": 4},
                 "supports only SP degrees 1 and 2",
             ),
+            (
+                {"batching_max_size": 2},
+                "dynamic batching with SP requires K/V-gather",
+            ),
             ({"cfg_parallel_degree": 2}, "TP=DP=CFG=1"),
             ({"sp_degree": 1, "ulysses_degree": 1}, "num_gpus == sp_degree"),
             (
@@ -182,12 +213,6 @@ class TestLLaDAImagePipelineConfig(unittest.TestCase):
                 },
                 "embedded text encoder to remain resident",
             ),
-            ({"llada_image_max_pixel_area": 0}, "must be positive"),
-            ({"llada_image_max_total_pixel_area": 0}, "must be positive"),
-            (
-                {"llada_image_max_text_tokens": 4000},
-                "at most 3584",
-            ),
         ]
         for overrides, message in invalid_cases:
             args = defaults | overrides
@@ -195,132 +220,6 @@ class TestLLaDAImagePipelineConfig(unittest.TestCase):
                 ValueError, message
             ):
                 self.config.validate_server_args(SimpleNamespace(**args))
-
-    def test_validates_request_sampling_params_bounds(self):
-        def params(**overrides):
-            values = dict(
-                width=1024,
-                height=1024,
-                max_sequence_length=2048,
-                num_outputs_per_prompt=1,
-                diffusers_kwargs=None,
-                enable_cache_dit=None,
-                cache_dit_params=None,
-                cfg_gate_step=None,
-                attention_backend_override=None,
-            )
-            values.update(overrides)
-            return SimpleNamespace(**values)
-
-        def server(**overrides):
-            values = dict(
-                sp_degree=1,
-                llada_image_max_pixel_area=None,
-                llada_image_max_text_tokens=None,
-                llada_image_max_total_pixel_area=None,
-            )
-            values.update(overrides)
-            return SimpleNamespace(**values)
-
-        sp1 = server()
-        sp2 = server(sp_degree=2)
-
-        self.config.validate_request_sampling_params(params(), sp1)
-        self.config.validate_request_sampling_params(
-            params(max_sequence_length=None), sp1
-        )
-        self.config.validate_request_sampling_params(
-            params(width=2048, height=2048, max_sequence_length=3584), sp2
-        )
-        self.config.validate_request_sampling_params(
-            params(num_outputs_per_prompt=10), sp1
-        )
-        self.config.validate_request_sampling_params(
-            params(enable_cache_dit=False), sp1
-        )
-        self.config.validate_request_sampling_params(params(cfg_gate_step=0.5), sp1)
-        self.config.validate_request_sampling_params(
-            params(attention_backend_override="fa"), sp1
-        )
-        self.config.validate_request_sampling_params(
-            params(attention_backend_override="TORCH_SDPA"), sp1
-        )
-
-        invalid_cases = [
-            (params(width=0), sp1, "positive width and height"),
-            (params(width=1000), sp1, "divisible by 16"),
-            (params(height=1040), sp2, "divisible by 32 at SP degree 2"),
-            (params(width=2064, height=2064), sp1, "exceeds the supported maximum"),
-            (params(max_sequence_length=0), sp1, "positive integer"),
-            (params(max_sequence_length=True), sp1, "positive integer"),
-            (params(max_sequence_length="2048"), sp1, "positive integer"),
-            (
-                params(max_sequence_length=3585),
-                sp1,
-                "exceeds the embedded text encoder budget",
-            ),
-            (
-                params(),
-                server(llada_image_max_pixel_area=512 * 512),
-                "exceeds the supported maximum of 262144",
-            ),
-            (
-                params(),
-                server(llada_image_max_text_tokens=1024),
-                "budget of 1024 tokens",
-            ),
-            (
-                params(width=2048, height=2048, num_outputs_per_prompt=10),
-                sp1,
-                "total output area",
-            ),
-            (
-                params(num_outputs_per_prompt=2),
-                server(llada_image_max_total_pixel_area=1024 * 1024),
-                "total output area",
-            ),
-            (
-                params(diffusers_kwargs={"max_sequence_length": 4096}),
-                sp1,
-                "exceeds the embedded text encoder budget",
-            ),
-            (
-                params(diffusers_kwargs={"max_sequence_length": "x"}),
-                sp1,
-                "positive integer",
-            ),
-            (params(enable_cache_dit=True), sp1, "does not support enable_cache_dit"),
-            (
-                params(cache_dit_params={}),
-                sp1,
-                "does not support cache_dit_params",
-            ),
-            (
-                params(attention_backend_override="sage_attn"),
-                sp1,
-                "must be fa or torch_sdpa",
-            ),
-            (
-                params(attention_backend_override=1),
-                sp1,
-                "must be fa or torch_sdpa",
-            ),
-            (params(cfg_gate_step=-0.1), sp1, "must be between 0.0 and 1.0"),
-            (params(cfg_gate_step=1.1), sp1, "must be between 0.0 and 1.0"),
-            (params(cfg_gate_step=True), sp1, "must be between 0.0 and 1.0"),
-            (params(cfg_gate_step=float("nan")), sp1, "must be between 0.0 and 1.0"),
-            (params(cfg_gate_step=float("inf")), sp1, "must be between 0.0 and 1.0"),
-            (params(cfg_gate_step=10**1000), sp1, "must be between 0.0 and 1.0"),
-            (params(cfg_gate_step="0.5"), sp1, "must be between 0.0 and 1.0"),
-        ]
-        for sampling_params, server_args, message in invalid_cases:
-            with self.subTest(message=message), self.assertRaisesRegex(
-                ValueError, message
-            ):
-                self.config.validate_request_sampling_params(
-                    sampling_params, server_args
-                )
-
 
 if __name__ == "__main__":
     unittest.main()

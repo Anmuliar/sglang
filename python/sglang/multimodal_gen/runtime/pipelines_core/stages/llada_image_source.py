@@ -66,21 +66,29 @@ class LLaDAImageSourceImageConditioningStage(PipelineStage):
             if isinstance(batch.condition_image, list)
             else [batch.condition_image]
         )
-        if len(source_images) != 1:
-            raise ValueError("LLaDA-Image editing requires exactly one source image")
+        prompt_count = len(batch.prompt) if isinstance(batch.prompt, list) else 1
+        if len(source_images) != prompt_count:
+            raise ValueError(
+                "LLaDA-Image editing requires one source image per prompt, "
+                f"got {len(source_images)} images for {prompt_count} prompts"
+            )
 
         image = self.image_processor.preprocess(
-            source_images[0],
+            source_images[0] if prompt_count == 1 else source_images,
             height=batch.height,
             width=batch.width,
             resize_mode="crop",
         )
-        if image.shape[0] == 1 and batch.batch_size > 1:
-            image = image.repeat(batch.batch_size, 1, 1, 1)
+        if image.shape[0] != prompt_count:
+            raise ValueError(
+                "LLaDA-Image source image preprocessing returned "
+                f"{image.shape[0]} images for {prompt_count} prompts"
+            )
+        image = image.repeat_interleave(batch.num_outputs_per_prompt, dim=0)
         if image.shape[0] != batch.batch_size:
             raise ValueError(
-                "LLaDA-Image source image batch must contain one image or match "
-                f"the effective batch size {batch.batch_size}, got {image.shape[0]}"
+                "LLaDA-Image source image batch must match the effective batch "
+                f"size {batch.batch_size}, got {image.shape[0]}"
             )
 
         sigvq_pixels = F.interpolate(
