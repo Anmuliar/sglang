@@ -415,6 +415,10 @@ class PipelineConfig:
         """
         return self.task_type in (ModelTaskType.T2I, ModelTaskType.T2V)
 
+    def supports_image_conditioned_dynamic_batching(self) -> bool:
+        """Return whether one source image per prompt can be dynamically batched."""
+        return False
+
     def supports_disaggregation(self) -> bool:
         """Return whether multi-service disaggregated deployment is supported."""
 
@@ -431,6 +435,14 @@ class PipelineConfig:
     def supports_sequential_multi_output_inference(self):
         """Return whether one request's outputs run through DiT/VAE sequentially."""
         return False
+
+    def supports_memory_release(self) -> bool:
+        """Return whether release_memory_occupation can offload this pipeline."""
+        return True
+
+    def supports_hot_weight_updates(self) -> bool:
+        """Return whether runtime weight updates cover this pipeline fully."""
+        return True
 
     def estimate_request_cost(self, batch) -> float:
         """Return the relative cost used for batching admission caps.

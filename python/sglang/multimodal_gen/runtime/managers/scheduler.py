@@ -457,11 +457,13 @@ class Scheduler(SchedulerWarmupMixin, SchedulerPostTrainingMixin, SchedulerDisag
         exclude_num_outputs = (
             self.server_args.pipeline_config.supports_sequential_dit_inference()
         )
+        exclude_image_path = self._supports_image_conditioned_dynamic_batching()
         return [
             (f.name, self._freeze_signature_value(getattr(sp, f.name, None)))
             for f in sp_fields
             if not f.metadata.get("batch_sig_exclude", False)
             and not (exclude_num_outputs and f.name == "num_outputs_per_prompt")
+            and not (exclude_image_path and f.name == "image_path")
         ]
 
     def _diffusers_kwargs_signature_value(self, req: Req) -> Any:
@@ -570,9 +572,15 @@ class Scheduler(SchedulerWarmupMixin, SchedulerPostTrainingMixin, SchedulerDisag
             candidate_req.prompt, str
         ):
             return "prompt_type"
+        base_image_kind = self._dynamic_batch_image_kind(base_req)
+        candidate_image_kind = self._dynamic_batch_image_kind(candidate_req)
+        if base_image_kind is None or candidate_image_kind is None:
+            return "image_conditioning"
+        if base_image_kind != candidate_image_kind:
+            return "image_conditioning_mismatch"
         if (
-            getattr(base_req, "image_path", None) is not None
-            or getattr(candidate_req, "image_path", None) is not None
+            base_image_kind == "image"
+            and not self._supports_image_conditioned_dynamic_batching()
         ):
             return "image_conditioning"
         if base_req.return_file_paths_only != candidate_req.return_file_paths_only:
@@ -592,6 +600,42 @@ class Scheduler(SchedulerWarmupMixin, SchedulerPostTrainingMixin, SchedulerDisag
     def _has_realtime_session(req: Req) -> bool:
         return bool(req.realtime_session_id) or req.session is not None
 
+    def _supports_image_conditioned_dynamic_batching(self) -> bool:
+        supports = getattr(
+            self.server_args.pipeline_config,
+            "supports_image_conditioned_dynamic_batching",
+            None,
+        )
+        return bool(supports()) if callable(supports) else False
+
+    @staticmethod
+    def _dynamic_batch_image_kind(req: Req) -> str | None:
+        image_path = getattr(req, "image_path", None)
+        if image_path is None:
+            return "text"
+        if isinstance(image_path, str):
+            return "image"
+        if (
+            isinstance(image_path, (list, tuple))
+            and len(image_path) == 1
+            and isinstance(image_path[0], str)
+        ):
+            return "image"
+        return None
+
+    @staticmethod
+    def _dynamic_batch_image_path(req: Req) -> str:
+        image_path = getattr(req, "image_path", None)
+        if isinstance(image_path, str):
+            return image_path
+        if (
+            isinstance(image_path, (list, tuple))
+            and len(image_path) == 1
+            and isinstance(image_path[0], str)
+        ):
+            return image_path[0]
+        raise ValueError("Dynamic batching requires exactly one source image")
+
     def _can_dynamic_batch(self, base_req: Req, candidate_req: Req) -> bool:
         """Return whether `candidate_req` can be merged into a batch with `base_req`."""
         if base_req.is_warmup or candidate_req.is_warmup:
@@ -607,9 +651,15 @@ class Scheduler(SchedulerWarmupMixin, SchedulerPostTrainingMixin, SchedulerDisag
         ):
             return False
 
+        base_image_kind = self._dynamic_batch_image_kind(base_req)
+        candidate_image_kind = self._dynamic_batch_image_kind(candidate_req)
+        if base_image_kind is None or candidate_image_kind is None:
+            return False
+        if base_image_kind != candidate_image_kind:
+            return False
         if (
-            getattr(base_req, "image_path", None) is not None
-            or getattr(candidate_req, "image_path", None) is not None
+            base_image_kind == "image"
+            and not self._supports_image_conditioned_dynamic_batching()
         ):
             return False
         if base_req.return_file_paths_only != candidate_req.return_file_paths_only:
@@ -834,6 +884,10 @@ class Scheduler(SchedulerWarmupMixin, SchedulerPostTrainingMixin, SchedulerDisag
 
         merged_req = deepcopy(base_req)
         merged_req.prompt = [req.prompt for req in reqs]
+        if self._dynamic_batch_image_kind(base_req) == "image":
+            merged_req.image_path = [
+                self._dynamic_batch_image_path(req) for req in reqs
+            ]
 
         merged_req.extra = deepcopy(merged_req.extra)
         merged_req.extra["dynamic_batch_seeds"] = [req.seed for req in reqs]

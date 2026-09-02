@@ -155,6 +155,49 @@ class TestUSPAttentionKVGather(unittest.TestCase):
 
         torch.testing.assert_close(out, expected)
 
+    def test_batched_padding_mask_with_replicated_suffix(self):
+        suffix = 2
+        q = torch.randn(2, 5, self.heads, self.head_dim)
+        k = torch.randn(2, 5, self.heads, self.head_dim)
+        v = torch.randn(2, 5, self.heads, self.head_dim)
+        gathered_k_prefix = torch.randn(2, 6, self.heads, self.head_dim)
+        gathered_v_prefix = torch.randn(2, 6, self.heads, self.head_dim)
+        full_k = torch.cat([gathered_k_prefix, k[:, -suffix:]], dim=1)
+        full_v = torch.cat([gathered_v_prefix, v[:, -suffix:]], dim=1)
+        query_mask = torch.tensor(
+            [
+                [True, True, True, True, False],
+                [True, True, True, True, True],
+            ]
+        )
+        gathered_key_prefix = torch.tensor(
+            [
+                [True, True, True, True, True, True],
+                [True, True, True, True, True, True],
+            ]
+        )
+        key_mask = torch.cat([gathered_key_prefix, query_mask[:, -suffix:]], dim=1)
+
+        out = self._run(
+            q,
+            k,
+            v,
+            [gathered_k_prefix, gathered_v_prefix, gathered_key_prefix],
+            attn_mask=query_mask,
+            attn_mask_meta={},
+            num_replicated_suffix=suffix,
+        )
+        expected = _reference_attention(
+            q,
+            full_k,
+            full_v,
+            self.attn.softmax_scale,
+            key_mask=key_mask,
+            query_mask=query_mask,
+        )
+
+        torch.testing.assert_close(out, expected)
+
     def test_separate_replicated_kv_prefix_gathers_only_suffix(self):
         q = torch.randn(1, 3, self.heads, self.head_dim)
         k_prefix = torch.randn(1, 2, self.heads, self.head_dim)

@@ -98,6 +98,7 @@ from sglang.multimodal_gen.runtime.loader.transformer_load_utils import (
     TransformerQuantLoadSpec,
     _filter_duplicate_precision_variant_safetensors,
     _Flux2Nvfp4FallbackAdapter,
+    _ModelOptFp8OffloadAdapter,
     _needs_device_weight_postprocess,
     _resolve_quant_config,
     resolve_transformer_quant_load_spec,
@@ -105,6 +106,7 @@ from sglang.multimodal_gen.runtime.loader.transformer_load_utils import (
 )
 from sglang.multimodal_gen.runtime.loader.weight_load_plan import WeightLoadPlan
 from sglang.multimodal_gen.runtime.models.dits.flux import FluxSingleTransformerBlock
+from sglang.multimodal_gen.runtime.models.dits.llada_image import LLaDAImageFeedForward
 from sglang.multimodal_gen.runtime.models.dits.minimax_h3 import MiniMaxH3DiTModel
 from sglang.multimodal_gen.runtime.platforms import AttentionBackendEnum
 from sglang.multimodal_gen.runtime.platforms.interface import DeviceCapability
@@ -146,6 +148,14 @@ def _make_quant_config(name: str, **attrs):
     for attr_name, attr_value in attrs.items():
         setattr(quant_config, attr_name, attr_value)
     return quant_config
+
+
+class _FakeOnlineFp8Config:
+    is_checkpoint_fp8_serialized = False
+
+    @classmethod
+    def get_name(cls):
+        return "fp8"
 
 
 class TestTransformerQuantHelpers(unittest.TestCase):
@@ -261,6 +271,28 @@ class TestTransformerQuantHelpers(unittest.TestCase):
             backend = _default_quantized_attention_backend(quant_spec, server_args)
 
         self.assertIsNone(backend)
+
+    def test_explicit_fp8_quantization_uses_online_defaults(self):
+        config = _resolve_quant_config(
+            hf_config={},
+            server_args=self._make_server_args(quantization="fp8"),
+            safetensors_list=[],
+            component_model_path="/unused/component/path",
+        )
+
+        self.assertEqual(config.get_name(), "fp8")
+        self.assertFalse(config.is_checkpoint_fp8_serialized)
+        self.assertEqual(config.activation_scheme, "dynamic")
+
+    def test_online_fp8_disables_whole_dit_cpu_offload(self):
+        server_args = self._make_server_args(dit_cpu_offload=True)
+
+        _ModelOptFp8OffloadAdapter._maybe_disable_incompatible_dit_offload_modes(
+            server_args=server_args,
+            quant_config=_FakeOnlineFp8Config(),
+        )
+
+        self.assertFalse(server_args.dit_cpu_offload)
 
     def test_resolve_transformer_safetensors_to_load_uses_single_override_file(self):
         with tempfile.NamedTemporaryFile(suffix=".safetensors") as f:
@@ -895,10 +927,17 @@ class TestTransformerQuantHelpers(unittest.TestCase):
 
         warning.assert_called_once()
 
-    def test_modelopt_fp8_serialized_checkpoint_needs_device_postprocess(self):
+    def test_modelopt_fp8_always_needs_device_weight_postprocess(self):
+        # Even a serialized checkpoint requantizes fused shards through
+        # scaled_fp8_quant(), which cannot process CPU tensors.
         self.assertTrue(
             _needs_device_weight_postprocess(
                 ModelOptFp8Config(is_checkpoint_fp8_serialized=True)
+            )
+        )
+        self.assertTrue(
+            _needs_device_weight_postprocess(
+                ModelOptFp8Config(is_checkpoint_fp8_serialized=False)
             )
         )
 
@@ -1463,6 +1502,33 @@ class TestTransformerQuantHelpers(unittest.TestCase):
                     _resolve_quant_method_name({"quant_method": quant_method}),
                     quant_method,
                 )
+
+    @patch("sglang.multimodal_gen.runtime.layers.linear.get_group_rank", return_value=0)
+    @patch("sglang.multimodal_gen.runtime.layers.linear.get_group_size", return_value=1)
+    @patch(
+        "sglang.multimodal_gen.runtime.layers.linear.get_tp_group", return_value=None
+    )
+    def test_llada_image_online_fp8_quantizes_fused_linears(
+        self,
+        _mock_tp_group,
+        _mock_group_size,
+        _mock_group_rank,
+    ):
+        fp8_module = "sglang.multimodal_gen.runtime.layers.quantization.fp8"
+        with patch(
+            f"{fp8_module}.get_tensor_model_parallel_world_size",
+            return_value=1,
+        ):
+            feed_forward = LLaDAImageFeedForward(
+                dim=192,
+                quant_config=Fp8Config(),
+                prefix="layers.0.feed_forward",
+            )
+
+        self.assertIsInstance(feed_forward.w13.quant_method, Fp8LinearMethod)
+        self.assertIsInstance(feed_forward.w2.quant_method, Fp8LinearMethod)
+        self.assertEqual(feed_forward.w13.prefix, "layers.0.feed_forward.w13")
+        self.assertEqual(feed_forward.w2.prefix, "layers.0.feed_forward.w2")
 
     @patch("sglang.multimodal_gen.runtime.layers.linear.get_group_rank", return_value=0)
     @patch("sglang.multimodal_gen.runtime.layers.linear.get_group_size", return_value=1)

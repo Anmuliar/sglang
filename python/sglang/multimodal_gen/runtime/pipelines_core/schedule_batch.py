@@ -108,6 +108,10 @@ class Req:
     pooled_embeds: list[torch.Tensor] = field(default_factory=list)
     neg_pooled_embeds: list[torch.Tensor] = field(default_factory=list)
 
+    # GLM-Image autoregressive prior tokens
+    prior_token_id: torch.Tensor | None = None
+    prior_token_image_ids: torch.Tensor | list[torch.Tensor] | None = None
+
     # Additional text-related parameters
     max_sequence_length: int | None = None
     prompt_template: dict[str, Any] | None = None
@@ -126,6 +130,7 @@ class Req:
 
     # Latent tensors
     latents: torch.Tensor | None = None
+    source_latents: list[torch.Tensor] | None = None
     y: torch.Tensor | None = None
     # Flux-2
     latent_ids: torch.Tensor | None = None
