@@ -221,7 +221,9 @@ killall_sglang = "sglang.cli.killall:main"
 "sglang" = [
   "srt/**/*",
   "kernels/**/*",
-  "multimodal_gen/apps/realtime_webui/**/*"
+  "multimodal_gen/apps/realtime_webui/**/*",
+  "multimodal_gen/runtime/models/vaes/duo/solarx/LICENSE",
+  "multimodal_gen/runtime/models/vaes/duo/solarx/tables/*.pt"
 ]
 
 [tool.setuptools.exclude-package-data]
