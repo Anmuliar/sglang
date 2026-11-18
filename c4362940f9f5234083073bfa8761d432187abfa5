@@ -1,0 +1,23 @@
+python/sglang/multimodal_gen/runtime/models/dits/duo/modelopt.py
+  s_9be4bd449be508::t_bfef27b8f4a565 1-208
+python/sglang/multimodal_gen/runtime/models/dits/duo/native_dcp.py
+  s_9be4bd449be508::t_6e637178dd65de 1-1257
+python/sglang/multimodal_gen/test/unit/duo/test_native_engine.py
+  s_9be4bd449be508::t_4b98b603f240c8 1-254
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "c4362940f9f5234083073bfa8761d432187abfa5",
+  "prompts": {},
+  "sessions": {
+    "s_9be4bd449be508": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a0cdac-4885-7332-9ede-7f9187da0e71",
+        "model": "gpt-6.2-astra"
+      },
+      "human_author": "珂淼 <wuchengzhang.wcz@antgroup.com>"
+    }
+  }
+}

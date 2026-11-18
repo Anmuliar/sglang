@@ -1,0 +1,31 @@
+python/sglang/multimodal_gen/runtime/models/vaes/duo/codec.py
+  s_9be4bd449be508::t_f29650683ff325 1-349
+python/sglang/multimodal_gen/runtime/models/vaes/duo/parallel.py
+  s_9be4bd449be508::t_1793d34aae6c82 1-275
+python/sglang/multimodal_gen/runtime/models/vaes/duo/solarx/LICENSE
+  s_9be4bd449be508::t_7e47c8a3c88f4a 1-52
+python/sglang/multimodal_gen/runtime/models/vaes/duo/solarx/__init__.py
+  s_9be4bd449be508::t_4044925ae73412 1-81
+python/sglang/multimodal_gen/runtime/models/vaes/duo/solarx/stream_decoder.py
+  s_9be4bd449be508::t_aa552e50b3466c 1-582
+python/sglang/multimodal_gen/runtime/pipelines/duo/README.md
+  s_9be4bd449be508::t_34854c55f24eb0 1-37
+python/sglang/multimodal_gen/test/unit/duo/test_codec.py
+  s_9be4bd449be508::t_cec152bbd688fc 1-97
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "1a0817957da94567ff6d0310dfbaf32962c39107",
+  "prompts": {},
+  "sessions": {
+    "s_9be4bd449be508": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a0cdac-4885-7332-9ede-7f9187da0e71",
+        "model": "gpt-6.2-astra"
+      },
+      "human_author": "珂淼 <wuchengzhang.wcz@antgroup.com>"
+    }
+  }
+}
