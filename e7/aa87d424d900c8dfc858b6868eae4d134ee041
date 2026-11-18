@@ -1,0 +1,35 @@
+python/pyproject.toml
+  s_9be4bd449be508::t_374ca5b6360357 230-232
+python/sglang/multimodal_gen/configs/pipeline_configs/duo.py
+  s_9be4bd449be508::t_fb97f80621c272 1-51
+python/sglang/multimodal_gen/runtime/models/dits/duo/cache.py
+  s_9be4bd449be508::t_db25773f500d37 1-336
+python/sglang/multimodal_gen/runtime/models/dits/duo/checkpoint.py
+  s_9be4bd449be508::t_8eab5271dc7581 1-173
+python/sglang/multimodal_gen/runtime/models/dits/duo/geometry.py
+  s_9be4bd449be508::t_adfce807a50e0a 1-40
+python/sglang/multimodal_gen/runtime/models/dits/duo/kernels.py
+  s_9be4bd449be508::t_5bf6712175cf34 1-42
+python/sglang/multimodal_gen/runtime/models/dits/duo/model.py
+  s_9be4bd449be508::t_4efed1552934c2 1-606
+python/sglang/multimodal_gen/runtime/models/dits/duo/sequence.py
+  s_9be4bd449be508::t_a51ada4da0dee1 1-139
+python/sglang/multimodal_gen/test/unit/duo/test_projections.py
+  s_9be4bd449be508::t_e7fa526d2b8dd3 1-51
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "e7aa87d424d900c8dfc858b6868eae4d134ee041",
+  "prompts": {},
+  "sessions": {
+    "s_9be4bd449be508": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a0cdac-4885-7332-9ede-7f9187da0e71",
+        "model": "gpt-6.2-astra"
+      },
+      "human_author": "珂淼 <wuchengzhang.wcz@antgroup.com>"
+    }
+  }
+}
