@@ -4,10 +4,10 @@ These components execute the Duo Realization transformer and Codec without depen
 
 ## Installation and model dependencies
 
-Install this SGLang source checkout with the diffusion extra. The checkpoint reader and exact Duo sequence/sampler contracts still require the matching model-provider source containing torchtitan and data; this component extraction does not replace that dependency. Set DUO_MODEL_SOURCE to that directory and add it to PYTHONPATH. No vLLM or SGLang-Omni import is required by these modules.
+For the [Duo Omni serving branch](https://github.com/sgl-project/sglang-omni/tree/sglang-omni-duo-support), use the [duo-0.5.23 checkout](https://github.com/Anmuliar/sglang/tree/duo-0.5.23), based on the same SGLang release that Omni requires. Install this checkout with the diffusion extra. The checkpoint reader and exact Duo sequence/sampler contracts still require the matching model-provider source containing torchtitan and data; this component extraction does not replace that dependency. Set DUO_MODEL_SOURCE to that directory and add it to PYTHONPATH. No vLLM or SGLang-Omni import is required by these modules.
 
 ```bash
-pip install -e 'python[diffusion]'
+SETUPTOOLS_SCM_PRETEND_VERSION_FOR_SGLANG=0.5.23+duo pip install -e 'python[diffusion]'
 export DUO_MODEL_SOURCE=/path/to/Duo/third_party/duo
 export PYTHONPATH="$PWD/python:$DUO_MODEL_SOURCE"
 export TORCHTITAN_LIVE=1
