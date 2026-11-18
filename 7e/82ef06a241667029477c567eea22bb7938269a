@@ -1,0 +1,77 @@
+python/sglang/multimodal_gen/runtime/models/dits/duo/checkpoint.py
+  s_9be4bd449be508::t_4901197ceb5ed5 10-12
+  s_9be4bd449be508::t_5afbaa0036cc46 1-9,13-173
+python/sglang/multimodal_gen/runtime/models/dits/duo/kernels.py
+  s_9be4bd449be508::t_4901197ceb5ed5 2-22
+  s_9be4bd449be508::t_67d89460db6daf 1,23-42
+python/sglang/multimodal_gen/runtime/models/dits/duo/ring.py
+  s_9be4bd449be508::t_4901197ceb5ed5 8-9
+  s_9be4bd449be508::t_44a394ba3d224e 1-7,10-225
+python/sglang/multimodal_gen/runtime/models/vaes/duo/codec.py
+  s_9be4bd449be508::t_4901197ceb5ed5 10-27
+  s_9be4bd449be508::t_e11d68aacc5b81 1-9,28-349
+python/sglang/multimodal_gen/test/unit/duo/test_kernels_codec.py
+  s_9be4bd449be508::t_4901197ceb5ed5 16-23,61,196
+  s_9be4bd449be508::t_573e435148670b 1-15,24-60,62-195,197-222
+python/sglang/multimodal_gen/runtime/models/vaes/duo/parallel.py
+  s_9be4bd449be508::t_4901197ceb5ed5 16-26
+  s_9be4bd449be508::t_1f579c5c45f0ab 1-15,27-275
+python/sglang/multimodal_gen/runtime/pipelines/duo/session.py
+  s_9be4bd449be508::t_4901197ceb5ed5 2-28
+  s_9be4bd449be508::t_19cd737f64bf76 1,29-375
+python/sglang/multimodal_gen/runtime/models/dits/duo/cache.py
+  s_9be4bd449be508::t_4901197ceb5ed5 6
+  s_9be4bd449be508::t_a9f8402b31b8cd 1-5,7-336
+python/sglang/multimodal_gen/runtime/models/dits/duo/modelopt.py
+  s_9be4bd449be508::t_4901197ceb5ed5 10-25,31
+  s_9be4bd449be508::t_a3b917d0de4159 1-9,26-30,32-208
+python/sglang/multimodal_gen/runtime/models/dits/duo/native_dcp.py
+  s_9be4bd449be508::t_4901197ceb5ed5 14-84
+  s_9be4bd449be508::t_83ea9f37722d72 1-13,85-1257
+python/sglang/multimodal_gen/test/unit/duo/test_native.py
+  s_9be4bd449be508::t_4901197ceb5ed5 22,27-57,549,659,686
+  s_9be4bd449be508::t_c63bbc2a9fd21f 1-21,23-26,58-548,550-658,660-685,687-873
+python/sglang/multimodal_gen/runtime/models/dits/duo/model.py
+  s_9be4bd449be508::t_4901197ceb5ed5 9-29,38
+  s_9be4bd449be508::t_16c970053eea3f 1-8,30-37,39-593
+python/pyproject.toml
+  s_9be4bd449be508::t_b378edb4402e3c 230-232
+python/sglang/multimodal_gen/configs/pipeline_configs/duo.py
+  s_9be4bd449be508::t_ad87cd8eed6432 1-51
+python/sglang/multimodal_gen/runtime/models/dits/duo/fp8_execution.py
+  s_9be4bd449be508::t_eff785631768a0 1-267
+python/sglang/multimodal_gen/runtime/models/dits/duo/fp8_kernels.py
+  s_9be4bd449be508::t_346ff7a5a6f647 1-220
+python/sglang/multimodal_gen/runtime/models/dits/duo/geometry.py
+  s_9be4bd449be508::t_63600061206210 1-40
+python/sglang/multimodal_gen/runtime/models/dits/duo/native_execution.py
+  s_9be4bd449be508::t_c4677290fdbc17 1-208
+python/sglang/multimodal_gen/runtime/models/dits/duo/sequence.py
+  s_9be4bd449be508::t_75690656d46774 1-139
+python/sglang/multimodal_gen/runtime/models/vaes/duo/solarx/LICENSE
+  s_9be4bd449be508::t_ede1897797ad5a 1-52
+python/sglang/multimodal_gen/runtime/models/vaes/duo/solarx/__init__.py
+  s_9be4bd449be508::t_aea647808870f0 1-81
+python/sglang/multimodal_gen/runtime/models/vaes/duo/solarx/stream_decoder.py
+  s_9be4bd449be508::t_df70760787d187 1-582
+python/sglang/multimodal_gen/runtime/pipelines/duo/README.md
+  s_9be4bd449be508::t_af4c35b2ca8cc8 1-37
+python/sglang/multimodal_gen/runtime/pipelines/duo/loader.py
+  s_9be4bd449be508::t_508cf6a579afce 1-106
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "7e82ef06a241667029477c567eea22bb7938269a",
+  "prompts": {},
+  "sessions": {
+    "s_9be4bd449be508": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a0cdac-4885-7332-9ede-7f9187da0e71",
+        "model": "gpt-6-astra"
+      },
+      "human_author": "珂淼 <wuchengzhang.wcz@antgroup.com>"
+    }
+  }
+}
