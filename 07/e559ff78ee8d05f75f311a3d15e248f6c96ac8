@@ -12,6 +12,7 @@ python/sglang/multimodal_gen/runtime/models/vaes/duo/solarx/stream_decoder.py
   s_9be4bd449be508::t_8c8f023ad34150 1-582
 python/sglang/multimodal_gen/runtime/pipelines/duo/README.md
   s_9be4bd449be508::t_4665234efea4b0 1-39
+  s_9be4bd449be508::t_b797751834cbb6 5-6
 python/sglang/multimodal_gen/test/unit/duo/test_codec.py
   s_9be4bd449be508::t_96bd30ded8411a 1-97
 ---
