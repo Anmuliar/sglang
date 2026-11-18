@@ -1,0 +1,35 @@
+benchmark/diffusion/duo/fp8/build.py
+  s_9be4bd449be508::t_50768af5733232 1-194
+benchmark/diffusion/duo/fp8/csrc/fullapi_async.LICENSE
+  s_9be4bd449be508::t_ddd58df2b84464 1-29
+benchmark/diffusion/duo/fp8/csrc/fullapi_async.patch
+  s_9be4bd449be508::t_614fa394dc8341 1-187
+python/sglang/multimodal_gen/runtime/models/dits/duo/fp8_execution.py
+  s_9be4bd449be508::t_a4d94486b6a397 1-267
+python/sglang/multimodal_gen/runtime/models/dits/duo/fp8_kernels.py
+  s_9be4bd449be508::t_cd8d8a81f38358 1-220
+python/sglang/multimodal_gen/runtime/models/dits/duo/native_execution.py
+  s_9be4bd449be508::t_158e1fb05b93cf 1-208
+python/sglang/multimodal_gen/runtime/models/dits/duo/ring.py
+  s_9be4bd449be508::t_e9cf13ecdccd91 1-225
+python/sglang/multimodal_gen/test/unit/duo/test_execution.py
+  s_9be4bd449be508::t_9a76f55767723d 1-183
+python/sglang/multimodal_gen/test/unit/duo/test_fp8_kernels.py
+  s_9be4bd449be508::t_7d3e1f28967303 1-87
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "8934a1053d7334a8a2c27e42a9cd4f578dca4cf4",
+  "prompts": {},
+  "sessions": {
+    "s_9be4bd449be508": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a0cdac-4885-7332-9ede-7f9187da0e71",
+        "model": "gpt-6.2-astra"
+      },
+      "human_author": "珂淼 <wuchengzhang.wcz@antgroup.com>"
+    }
+  }
+}
