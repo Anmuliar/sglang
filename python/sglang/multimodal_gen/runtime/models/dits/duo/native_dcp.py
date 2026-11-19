@@ -320,6 +320,7 @@ class NativeDCPRealization(nn.Module):
         self.fp8_workspaces: list[CalibratedFP8Workspace] = []
         self.fp8_workspace_storage: torch.Tensor | None = None
         self.fp8_attention: SM90FP8Attention | None = None
+        self.calibrated_fa3 = flash_attn_with_kvcache
 
     @torch.no_grad()
     def prepare_fixed_weights(self, options: NativeDCPOptions) -> None:
@@ -411,6 +412,12 @@ class NativeDCPRealization(nn.Module):
             if self.options.fp8_attention_library is None
             else SM90FP8Attention(self.options.fp8_attention_library)
         )
+        if self.fp8_attention is None:
+            from sgl_fa3 import flash_attn_with_kvcache as calibrated_fa3
+
+            self.calibrated_fa3 = calibrated_fa3
+        else:
+            self.calibrated_fa3 = flash_attn_with_kvcache
         if self.fp8_attention is not None and (
             self.fp8_calibration.scales.shape[-1] != self.fp8_attention.local_heads
         ):
@@ -627,7 +634,12 @@ class NativeDCPRealization(nn.Module):
                         ),
                     ).unsqueeze(0)
                 elif self.use_flash_attention:
-                    output = flash_attn_with_kvcache(
+                    attention = (
+                        self.calibrated_fa3
+                        if fp8_workspace is not None
+                        else flash_attn_with_kvcache
+                    )
+                    output = attention(
                         query,
                         selected_k,
                         selected_v,

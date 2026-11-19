@@ -13,7 +13,24 @@ export PYTHONPATH="$PWD/python:$DUO_MODEL_SOURCE"
 export TORCHTITAN_LIVE=1
 ```
 
-Use matching Duo base, distill, adapter, and protocol assets. Preserve checkpoint RoPE, AdaLN, codec configuration, and weight dtype. FP8 Linear weights do not enable FP8 Attention; the latter requires a separately configured calibration and SM90 library. Optional library build sources are in benchmark/diffusion/duo/fp8.
+Use matching Duo base, distill, adapter, and protocol assets. Preserve checkpoint RoPE, AdaLN, codec configuration, and weight dtype. FP8 Linear weights do not enable FP8 Attention; the latter requires attention calibration. Omit the optional legacy SM90 library override to use native FA3.
+
+## H200 TP8 long-window FP8 attention
+
+With attention calibration enabled, Duo can use the SM90a long-window build of
+`sgl-fa3`. Install the tested wheel into the worker environment before starting
+the service (CUDA 13.0, PyTorch 2.14.1, Linux x86-64):
+
+```bash
+python -m pip install "${WHEEL_DIR}/sgl_fa3-0.1.0+duotp8.n128-cp310-abi3-linux_x86_64.whl"
+python -c 'from importlib.metadata import version; import sgl_fa3; print(version("sgl-fa3"), sgl_fa3.__file__)'
+```
+
+The `n128` build selects a 128×128 tile for dense, single-split FP8 media
+attention at batch size 1, seven local heads of dimension 128, 2,048–2,304
+query rows and 57,344–65,536 key rows. Other shapes retain the wheel's normal
+dispatch. The published stock wheel also supports calibrated FP8 attention;
+the long-window specialization requires the custom build.
 
 ## Ownership and execution
 
