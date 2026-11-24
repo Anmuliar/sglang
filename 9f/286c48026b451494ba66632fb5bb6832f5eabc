@@ -1,0 +1,23 @@
+python/sglang/multimodal_gen/runtime/models/dits/zimage.py
+  s_f6da58639af786::t_cd3626ed4191ee 16-20,853-854,857-858,1550-1557,1559-1566,1570-1571,1575-1576,1579-1580,1584-1592,1594-1597,1676,1686,1732,1743
+  s_f6da58639af786::t_97fa44d9f6e06b 1567-1569,1572-1574,1581-1583,1598-1602,1677-1682,1684-1685,1733-1738,1740-1742
+  s_f6da58639af786::t_2b8171751cd9f8 1603
+  s_f6da58639af786::t_fece4195d26c02 1558,1577-1578,1593
+  s_f6da58639af786::t_616a7c131c839f 1683,1739
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "9f286c48026b451494ba66632fb5bb6832f5eabc",
+  "prompts": {},
+  "sessions": {
+    "s_f6da58639af786": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019f832f-9523-77d0-bd77-990ed55808b0",
+        "model": "gpt-6.2-astra"
+      },
+      "human_author": "珂淼 <wuchengzhang.wcz@antgroup.com>"
+    }
+  }
+}

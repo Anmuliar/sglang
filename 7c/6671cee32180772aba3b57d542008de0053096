@@ -1,0 +1,20 @@
+python/sglang/multimodal_gen/test/unit/test_sp_shard.py
+  s_f6da58639af786::t_bac10e63763407 14,25-42
+  s_f6da58639af786::t_9521ea53f754f4 43-44
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "7c6671cee32180772aba3b57d542008de0053096",
+  "prompts": {},
+  "sessions": {
+    "s_f6da58639af786": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019f832f-9523-77d0-bd77-990ed55808b0",
+        "model": "gpt-6.2-astra"
+      },
+      "human_author": "珂淼 <wuchengzhang.wcz@antgroup.com>"
+    }
+  }
+}
