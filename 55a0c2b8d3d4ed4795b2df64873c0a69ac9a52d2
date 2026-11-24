@@ -1,0 +1,19 @@
+python/sglang/multimodal_gen/runtime/pipelines/duo/README.md
+  s_9be4bd449be508::t_1fd03a6fcbccab 7,10
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "55a0c2b8d3d4ed4795b2df64873c0a69ac9a52d2",
+  "prompts": {},
+  "sessions": {
+    "s_9be4bd449be508": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a0cdac-4885-7332-9ede-7f9187da0e71",
+        "model": "gpt-6.2-astra"
+      },
+      "human_author": "珂淼 <wuchengzhang.wcz@antgroup.com>"
+    }
+  }
+}

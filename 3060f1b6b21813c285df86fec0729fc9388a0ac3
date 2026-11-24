@@ -1,0 +1,23 @@
+python/pyproject.toml
+  s_9be4bd449be508::t_9236f779fd3d18 83
+python/sglang/multimodal_gen/runtime/models/dits/duo/native_dcp.py
+  s_9be4bd449be508::t_681b18f3ea8c78 323,415-420,637-642
+python/sglang/multimodal_gen/runtime/pipelines/duo/README.md
+  s_9be4bd449be508::t_2a9f5bd2df421d 16-33
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "3060f1b6b21813c285df86fec0729fc9388a0ac3",
+  "prompts": {},
+  "sessions": {
+    "s_9be4bd449be508": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a0cdac-4885-7332-9ede-7f9187da0e71",
+        "model": "gpt-6.2-astra"
+      },
+      "human_author": "珂淼 <wuchengzhang.wcz@antgroup.com>"
+    }
+  }
+}

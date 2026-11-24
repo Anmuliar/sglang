@@ -1,0 +1,34 @@
+python/pyproject.toml
+  s_9be4bd449be508::t_d1fb73221c1d85 230-232
+python/sglang/multimodal_gen/runtime/models/vaes/duo/codec.py
+  s_9be4bd449be508::t_7587bf7420575f 1-349
+python/sglang/multimodal_gen/runtime/models/vaes/duo/parallel.py
+  s_9be4bd449be508::t_39d99e98b0f765 1-275
+python/sglang/multimodal_gen/runtime/models/vaes/duo/solarx/LICENSE
+  s_9be4bd449be508::t_331d9347d9d636 1-52
+python/sglang/multimodal_gen/runtime/models/vaes/duo/solarx/__init__.py
+  s_9be4bd449be508::t_04a08d0dd28a0d 1-81
+python/sglang/multimodal_gen/runtime/models/vaes/duo/solarx/stream_decoder.py
+  s_9be4bd449be508::t_8c8f023ad34150 1-582
+python/sglang/multimodal_gen/runtime/pipelines/duo/README.md
+  s_9be4bd449be508::t_4665234efea4b0 1-39
+  s_9be4bd449be508::t_b797751834cbb6 5-6
+python/sglang/multimodal_gen/test/unit/duo/test_codec.py
+  s_9be4bd449be508::t_96bd30ded8411a 1-97
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "07e559ff78ee8d05f75f311a3d15e248f6c96ac8",
+  "prompts": {},
+  "sessions": {
+    "s_9be4bd449be508": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a0cdac-4885-7332-9ede-7f9187da0e71",
+        "model": "gpt-6.2-astra"
+      },
+      "human_author": "珂淼 <wuchengzhang.wcz@antgroup.com>"
+    }
+  }
+}
